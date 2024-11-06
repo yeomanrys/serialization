@@ -8,6 +8,7 @@
 #include <map>
 #include <string.h>
 #include <string>
+#include <fstream>
 
 namespace serialize {
     template <class Archive, class T>
@@ -18,11 +19,14 @@ namespace serialize {
 } // namespace serialize
 
 namespace serialize {
+template <typename iostream>
 class Archive {
 protected:
     char* data = 0;
     size_t size = 0;
     size_t capacity = 0;
+    iostream io;
+    Archive() = default;
     void check_memory(size_t len) {
         len += size;
         if (len > capacity) {
@@ -56,15 +60,29 @@ protected:
         append(v.c_str(), v.size());
     }
 public:
+    Archive(const std::string& file) {
+        auto mode = std::is_same_v<iostream, std::ifstream> ? std::ios::in : std::ios::out;
+        if (!io.is_open())
+            io.open(file, mode);
+    }
     size_t len() {
         return size;
+    }
+    void close() {
+        if (io.is_open()) {
+            if (size && std::is_same_v<iostream, std::ofstream>)
+                io.write(data, size);
+            io.close();
+        }
     }
 };
 class IArchive;
 class OArchive;
-class IArchive final : public Archive {
+class IArchive final : public Archive<std::ofstream> {
     friend class OArchive;
 public:
+    IArchive() = default;
+    using Archive::Archive;
     void clear() {
         if (data)
             free(data);
@@ -151,7 +169,7 @@ public:
     }
 };
 
-class OArchive final : public Archive {
+class OArchive final : public Archive<std::ifstream> {
     friend class IArchive;
     size_t offset = 0;
     void copy(const char* buf, size_t len) {
@@ -162,7 +180,8 @@ class OArchive final : public Archive {
     }
 public:
     OArchive() = default;
-    OArchive(const char* buf, size_t len) {
+    using Archive::Archive;
+    explicit OArchive(const char* buf, size_t len) {
         copy(buf, len);
     }
     OArchive(const IArchive& iar) {
@@ -192,9 +211,13 @@ public:
         this->capacity = 0;
     }
     int realsize() {
+        int len = 0;
+        if (io.is_open()) {
+            io.read((char*)&len, 4);
+            return len;
+        }
         if (offset + 4 > size)
             throw "overflow";
-        int len = 0;
         memcpy(&len, data + offset, 4);
         offset += 4;
         if (offset + len > size)
@@ -208,29 +231,34 @@ public:
             return *this;
         }
         int len = realsize();
+        if (io.is_open()) {
+            io.read((char*)&v, len);
+            return *this;
+        }
         memcpy(&v, data + offset, len);
         offset += len;
         return *this;
     }
     OArchive& operator&(char*& v) {
         int len = realsize();
-        char* buf = (char*)malloc(len);
-        memcpy(buf, data + offset, len);
-        offset += len;
-        if (!v) {
-            v = (char*)malloc(len);
-            memcpy(v, buf, len);
+        v = (char*)malloc(len);
+        if (io.is_open()) {
+            io.read(v, len);
+            return *this;
         }
-        else
-            memcpy(v, buf, len);
-        free(buf);
+        memcpy(v, data + offset, len);
+        offset += len;
         return *this;   
     }
     OArchive& operator&(std::string& v) {
         int len = realsize();
         char* buf = (char*)malloc(len);
-        memcpy(buf, data + offset, len);
-        offset += len;
+        if (io.is_open()) {
+            io.read(buf, len);
+        } else {
+            memcpy(buf, data + offset, len);
+            offset += len;
+        }
         v = std::string(buf, len);
         free(buf);
         return *this;
