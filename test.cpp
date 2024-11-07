@@ -26,20 +26,13 @@ int main(int argc, char* argv[]) {
     msg.store[22] = "456";
 
     // 序列化
-    serialize::IArchive iar;
+    serialize::IArchive iar("./ser.bin");
     iar & msg;
-    std::ofstream ofs("./ser.bin");
-    ofs.write(iar.get(), iar.len());
-    ofs.close();
+    iar.close();
     
     // 反序列化
-    std::ifstream ifs("./ser.bin");
-    char buf[1024] = {0};
-    size_t size = ifs.read(buf, 1024).gcount();
-    ifs.close();
-    serialize::OArchive oar(buf, size);
-
     Message msgCopy;
+    serialize::OArchive oar("./ser.bin");
     oar & msgCopy;
     return 0;
 }
