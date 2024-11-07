@@ -80,6 +80,7 @@ public:
     void flush() {
         if (io.is_open() && size && std::is_same_v<iostream, std::ofstream>) {
             io.write(data, size);
+            io.flush();
             size = 0;
         }
     }

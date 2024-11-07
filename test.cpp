@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
     // 序列化
     serialize::IArchive iar("./ser.bin");
     iar & msg;
-    iar.close();
+    iar.flush();
     
     // 反序列化
     Message msgCopy;
