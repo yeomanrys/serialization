@@ -68,11 +68,19 @@ public:
     size_t len() {
         return size;
     }
-    void close() {
-        if (io.is_open()) {
-            if (size && std::is_same_v<iostream, std::ofstream>)
-                io.write(data, size);
+    void clear() {
+        if (data)
+            free(data);
+        data = 0;
+        size = 0;
+        capacity = 0;
+        if (io.is_open())
             io.close();
+    }
+    void flush() {
+        if (io.is_open() && size && std::is_same_v<iostream, std::ofstream>) {
+            io.write(data, size);
+            size = 0;
         }
     }
 };
@@ -83,13 +91,6 @@ class IArchive final : public Archive<std::ofstream> {
 public:
     IArchive() = default;
     using Archive::Archive;
-    void clear() {
-        if (data)
-            free(data);
-        data = 0;
-        size = 0;
-        capacity = 0;
-    }
     const char* get() {
         return data;
     }
@@ -214,6 +215,8 @@ public:
         int len = 0;
         if (io.is_open()) {
             io.read((char*)&len, 4);
+            if (len == 0)
+                throw "overflow";
             return len;
         }
         if (offset + 4 > size)
