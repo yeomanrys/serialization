@@ -61,7 +61,9 @@ protected:
     }
 public:
     Archive(const std::string& file) {
-        auto mode = std::is_same_v<iostream, std::ifstream> ? std::ios::in : std::ios::out;
+        auto mode = std::is_same_v<iostream, std::ifstream> ?
+            std::ios::in | std::ios::binary :
+            std::ios::out | std::ios::binary;
         if (!io.is_open())
             io.open(file, mode);
     }
